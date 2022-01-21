@@ -5,8 +5,8 @@
  * reached, replaces the worst server. Repeatable.
  */
 
-let maxServers;
-let servers;
+var maxServers;
+var servers;
 export async function main(ns) {
 	// Default Values
 	maxServers = ns.getPurchasedServerLimit();
@@ -52,7 +52,16 @@ function buyServer(ns, ram) {
 		let success = removeWeakestServer(ns, ram);
 		if (!success) { return false; }
 	}
-	let server = ns.purchaseServer(`Hackserver-${ram}GB`, ram);
+	let readableRam;
+	if (ram == 1048576) {
+		readableRam = "1PT"
+	} else if (ram >= 1024) {
+		let tempToReadableRam = Math.round((ram / 1024) * 10) / 10
+		readableRam = tempToReadableRam.toString() + "TB"
+	} else {
+		readableRam = ram.toString() + "GB"
+	}
+	let server = ns.purchaseServer(`botnet-${readableRam}`, ram);
 	servers.push(server);
 	ns.tprint(`Purchased ${server}: ${ram}GB`);
 	return true;
@@ -67,7 +76,7 @@ function removeWeakestServer(ns, newRam) {
 	}
 	let smallest_server = groupedServers[min][0];
 	ns.killall(smallest_server);
-	let result = ns.deleteServer(smallest_server);
+	ns.deleteServer(smallest_server);
 	servers = ns.getPurchasedServers(true);
 	return true;
 }
