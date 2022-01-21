@@ -1,0 +1,15 @@
+/** @param {NS} ns **/
+export async function main(ns) {
+	var sumTarget = ns.args[0];
+	var ways = [];
+
+	for (let a = 1; a <= sumTarget; a++) { ways[a] = 0; }
+
+	ways[0] = 1;
+	for (let h = 1; h <= sumTarget - 1; h++) {
+		for (let v = h; v <= sumTarget; v++) {
+			ways[v] += ways[v - h];
+		}
+	}
+	ns.tprint(`There are ${ways[sumTarget]} ways to sum ${sumTarget} with positive integers.`);
+}
