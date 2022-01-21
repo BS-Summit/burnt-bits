@@ -61,26 +61,26 @@ export async function main(ns) {
         }
     }
     // Prints the Lists of servers for status checking.
-    ns.tprint(`======================================================================`);
+    ns.tprint(`============================================================================`);
     ns.tprint(`Servers: ${serverList.length + ownedList.length}`);
     ns.tprint(` Owned: ${ownedList.length}`);
     ns.tprint(` Rooted Servers: ${rootedServerList.length}`);
     ns.tprint(`  Dead Servers: ${deadList.length}`);
     ns.tprint(`  Hack Servers: ${(hackList.length)}`);
     ns.tprint(`  Bot Servers: ${botList.length}`);
-    ns.tprint(`======================================================================`);
+    ns.tprint(`============================================================================`);
     ns.tprint(`Bot List:  ${botList.join(' ')}`);
-    ns.tprint(`----------------------------------------------------------------------`);
+    ns.tprint(`----------------------------------------------------------------------------`);
     await remoteHack(ns, botList, deadList, hackList)
-    ns.tprint(`======================================================================`);
+    ns.tprint(`============================================================================`);
     ns.tprint(`Dead List:  ${deadList.join(' ')}`);
-    ns.tprint(`----------------------------------------------------------------------`);
+    ns.tprint(`----------------------------------------------------------------------------`);
     await remoteHack(ns, ownedList, deadList, hackList)
-    ns.tprint(`======================================================================`);
+    ns.tprint(`============================================================================`);
     ns.tprint(`Hack List:  ${hackList.join(' ')}`);
-    ns.tprint(`----------------------------------------------------------------------`);
+    ns.tprint(`----------------------------------------------------------------------------`);
     await selfHack(ns, hackList)
-    ns.tprint(`======================================================================`);
+    ns.tprint(`============================================================================`);
 }
 
 /*
@@ -118,9 +118,9 @@ export async function remoteHack(ns, tOwnedList, tDeadList, t2HackList) {
                 let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
                 await ns.scp(hackScript, "home", server);
                 if (threads > 0) {
-                    textBufferServer = " ".repeat(16 - server.length);
-                    textBufferThread = " ".repeat(6 - threads.toString().length);
-                    textBufferTarget = " ".repeat(16 - targetServer.length);
+                    textBufferServer = " ".repeat(18 - server.length);
+                    textBufferThread = " ".repeat(8 - threads.toString().length);
+                    textBufferTarget = " ".repeat(18 - targetServer.length);
                     ns.tprint(`${server} ${textBufferServer}--->${textBufferThread} ${threads} threads  --->  ${targetServer}:${textBufferTarget} \$ ${payday.toFixed(2)}`);
                     ns.exec(hackScript, server, threads, targetServer, threads, targetSecurity, targetMoney);
                 }
@@ -139,9 +139,9 @@ export async function remoteHack(ns, tOwnedList, tDeadList, t2HackList) {
         let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
         await ns.scp(hackScript, "home", server);
         if (threads > 0) {
-            textBufferServer = " ".repeat(16 - server.length);
-            textBufferThread = " ".repeat(6 - threads.toString().length);
-            textBufferTarget = " ".repeat(16 - targetServer.length);
+            textBufferServer = " ".repeat(18 - server.length);
+            textBufferThread = " ".repeat(8 - threads.toString().length);
+            textBufferTarget = " ".repeat(18 - targetServer.length);
             ns.tprint(`${server} ${textBufferServer}--->${textBufferThread} ${threads} threads  --->  ${targetServer}:${textBufferTarget} \$ ${payday.toFixed(2)}`);
             ns.exec(hackScript, server, threads, targetServer, threads, targetSecurity, targetMoney);
         }
@@ -165,8 +165,8 @@ export async function selfHack(ns, tHackList) {
         let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
         await ns.scp(hackScript, "home", target);
         if (threads > 0) {
-            textBufferTarget = " ".repeat(16 - target.length);
-            textBufferThread = " ".repeat(6 - threads.toString().length);
+            textBufferTarget = " ".repeat(18 - target.length);
+            textBufferThread = " ".repeat(8 - threads.toString().length);
             ns.tprint(`${target} ${textBufferTarget}--->${textBufferThread} ${threads} threads  --->  ${target}:${textBufferTarget} \$ ${payday.toFixed(2)}`);
             ns.exec(hackScript, target, threads, target, threads, targetSecurity, targetMoney);
         }
