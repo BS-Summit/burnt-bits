@@ -8,49 +8,50 @@ export async function main(ns, args) {
 	var targets = targetList.join(" ");
 	var reservedRam = 0;
 
-	ns.tprint(`============================================================================`);
+	ns.tprint(`  ============================================================================`);
 	var serverRam = ns.getServerMaxRam("home");
-	ns.tprint(`Total Available RAM: ${serverRam} GB`)
+	ns.tprint(`  Total Available RAM: ${serverRam} GB`)
 	var updateScript = "update.js"
 	var updateRam = ns.getScriptRam(updateScript);
-	ns.tprint(` Update Script RAM: ${updateRam} GB`)
+	ns.tprint(`   Update Script RAM: ${updateRam} GB`)
 	var hackScript = "hack.js";
 	var scriptRam = ns.getScriptRam(hackScript);
-	ns.tprint(` Hack Script RAM: ${scriptRam} GB`)
+	ns.tprint(`   Hack Script RAM: ${scriptRam} GB`)
 	var maxThreads = Math.floor(serverRam / scriptRam);
 	var remainingThreads = maxThreads;
-	ns.tprint(`Max Threads: ${maxThreads}`)
+	ns.tprint(`  Max Threads: ${maxThreads}`)
 	var threads = Math.floor(maxThreads / targetList.length);
-	ns.tprint(` Threads: ${threads} / target`)
-	ns.tprint(`============================================================================`);
-	ns.tprint(`Farm List:  ${targets}`)
-	ns.tprint(`----------------------------------------------------------------------------`);
+	ns.tprint(`   Threads: ${threads} / target`)
+	ns.tprint(`  ============================================================================`);
+	ns.tprint(`  Farm List:  ${targets}`)
+	ns.tprint(`  ----------------------------------------------------------------------------`);
 	for (let i = targetList.length - 1; i >= 0; i--) {
 		let target = ns.args[i];
-		let targetSecurity = ns.getServerMinSecurityLevel(target) + 2;
-		let targetMoney = ns.getServerMaxMoney(target) * 0.9;
-		let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
+		let targetSecurity = ns.getServerMinSecurityLevel(target) + 5;
+		let targetMoney = ns.getServerMaxMoney(target) * 0.8;
 		let textBufferTarget = " ".repeat(18 - target.length);
-		let textBufferThread = " ".repeat(8 - threads.toString().length);
 		if (i == 0) {
-			reservedRam = serverRam - ((maxThreads - remainingThreads + threads) * scriptRam);
 			threads = remainingThreads
+			reservedRam = serverRam - (maxThreads * scriptRam);
 
-			while (reservedRam >= (updateRam + scriptRam)) { threads++; reservedRam = reservedRam - scriptRam; }
-			while (reservedRam < updateRam) { threads--; reservedRam = reservedRam + scriptRam; }
+			//while (reservedRam >= (updateRam + scriptRam)) { threads++; reservedRam -= scriptRam; }
+			while (reservedRam < updateRam) { threads--; reservedRam += scriptRam; }
 
-			payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
+			let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
+
+			let textBufferThread = " ".repeat(8 - threads.toString().length);
+			ns.tprint(`  Home               --->${textBufferThread} ${threads} threads  --->  ${target} ${textBufferTarget} \$ ${payday.toFixed(2)}`);
+			ns.tprint(`  ============================================================================`);
 			let reservedramReadable = Math.floor(reservedRam * 100) / 100;
-			textBufferThread = " ".repeat(8 - threads.toString().length);
-			ns.tprint(`  Home             --->${textBufferThread} ${threads} threads  --->  ${target}:${textBufferTarget} \$${payday.toFixed(2)}`);
-			ns.tprint(`============================================================================`);
 			ns.tprint(`${reservedramReadable}GB reserved for scripts.`);
 
 			ns.spawn(hackScript, threads, target, threads, targetSecurity, targetMoney);
 		} else {
-			ns.tprint(`  Home             --->${textBufferThread} ${threads} threads  --->  ${target}:${textBufferTarget} \$${payday.toFixed(2)}`);
+			let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
+			let textBufferThread = " ".repeat(8 - threads.toString().length);
+			ns.tprint(`  Home               --->${textBufferThread} ${threads} threads  --->  ${target} ${textBufferTarget} \$ ${payday.toFixed(2)}`);
 			ns.run(hackScript, threads, target, threads, targetSecurity, targetMoney);
-			remainingThreads = remainingThreads - threads;
+			remainingThreads -= threads;
 		}
 	}
 }
