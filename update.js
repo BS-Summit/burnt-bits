@@ -113,15 +113,15 @@ export async function remoteHack(ns, tOwnedList, tDeadList, t2HackList) {
                 let threads = Math.floor(serverRam / scriptRam);
                 let serverIndex = index % targetServers.length;
                 let targetServer = targetServers[serverIndex];
-                let targetSecurity = ns.getServerMinSecurityLevel(targetServer) + 2;
-                let targetMoney = ns.getServerMaxMoney(targetServer) * 0.9;
+                let targetSecurity = ns.getServerMinSecurityLevel(targetServer) + 5;
+                let targetMoney = ns.getServerMaxMoney(targetServer) * 0.8;
                 let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
                 await ns.scp(hackScript, "home", server);
                 if (threads > 0) {
                     textBufferServer = " ".repeat(18 - server.length);
                     textBufferThread = " ".repeat(8 - threads.toString().length);
                     textBufferTarget = " ".repeat(18 - targetServer.length);
-                    ns.tprint(`${server} ${textBufferServer}--->${textBufferThread} ${threads} threads  --->  ${targetServer}:${textBufferTarget} \$ ${payday.toFixed(2)}`);
+                    ns.tprint(`${server} ${textBufferServer}--->${textBufferThread} ${threads} threads  --->  ${targetServer} ${textBufferTarget} \$ ${payday.toFixed(2)}`);
                     ns.exec(hackScript, server, threads, targetServer, threads, targetSecurity, targetMoney);
                 }
             }
@@ -134,15 +134,15 @@ export async function remoteHack(ns, tOwnedList, tDeadList, t2HackList) {
         let threads = Math.floor(serverRam / scriptRam);
         let serverIndex = index % targetServers.length;
         let targetServer = targetServers[serverIndex];
-        let targetSecurity = ns.getServerMinSecurityLevel(targetServer) + 2;
-        let targetMoney = ns.getServerMaxMoney(targetServer) * 0.9;
+        let targetSecurity = ns.getServerMinSecurityLevel(targetServer) + 5;
+        let targetMoney = ns.getServerMaxMoney(targetServer) * 0.8;
         let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
         await ns.scp(hackScript, "home", server);
         if (threads > 0) {
             textBufferServer = " ".repeat(18 - server.length);
             textBufferThread = " ".repeat(8 - threads.toString().length);
             textBufferTarget = " ".repeat(18 - targetServer.length);
-            ns.tprint(`${server} ${textBufferServer}--->${textBufferThread} ${threads} threads  --->  ${targetServer}:${textBufferTarget} \$ ${payday.toFixed(2)}`);
+            ns.tprint(`${server} ${textBufferServer}--->${textBufferThread} ${threads} threads  --->  ${targetServer} ${textBufferTarget} \$ ${payday.toFixed(2)}`);
             ns.exec(hackScript, server, threads, targetServer, threads, targetSecurity, targetMoney);
         }
     }
@@ -160,14 +160,14 @@ export async function selfHack(ns, tHackList) {
         await ns.killall(target);
         let targetRam = ns.getServerMaxRam(target);
         let threads = Math.floor(targetRam / scriptRam);
-        let targetSecurity = ns.getServerMinSecurityLevel(target) + 2;
-        let targetMoney = ns.getServerMaxMoney(target) * 0.9;
+        let targetSecurity = ns.getServerMinSecurityLevel(target) + 5;
+        let targetMoney = ns.getServerMaxMoney(target) * 0.8;
         let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
         await ns.scp(hackScript, "home", target);
         if (threads > 0) {
             textBufferTarget = " ".repeat(18 - target.length);
             textBufferThread = " ".repeat(8 - threads.toString().length);
-            ns.tprint(`${target} ${textBufferTarget}--->${textBufferThread} ${threads} threads  --->  ${target}:${textBufferTarget} \$ ${payday.toFixed(2)}`);
+            ns.tprint(`${target} ${textBufferTarget}--->${textBufferThread} ${threads} threads  --->  ${target} ${textBufferTarget} \$ ${payday.toFixed(2)}`);
             ns.exec(hackScript, target, threads, target, threads, targetSecurity, targetMoney);
         }
     }
