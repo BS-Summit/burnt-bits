@@ -4,9 +4,12 @@
  * which can hack themselves to do so, and instructs your available servers to 
  * hack those which cannot hack themselves, (or the original set if no dead 
  * servers are available.
+ * args[0] if "grow" sets self-hacking servers to grow & weaken, over hacking themselves.
  */
-export async function main(ns) {
+export async function main(ns, args) {
     var serverList = new Set();
+    var growTag = 0;
+    if (ns.args[0] == "grow") { growTag = 1 }
     var hackList = [];
     var deadList = [];
     var botList = [];
@@ -79,7 +82,7 @@ export async function main(ns) {
     ns.tprint(`============================================================================`);
     ns.tprint(`Hack List:  ${hackList.join(' ')}`);
     ns.tprint(`----------------------------------------------------------------------------`);
-    await selfHack(ns, hackList)
+    await selfHack(ns, growTag, hackList)
     ns.tprint(`============================================================================`);
 }
 
@@ -89,7 +92,7 @@ export async function main(ns) {
  */
 export async function remoteHack(ns, tOwnedList, tDeadList, t2HackList) {
     let myServers = [...tOwnedList];
-    let growRun = 0
+    let growRun = 0;
     if (myServers.length < 6) { growRun = 1 }
     let targetServers = [...tDeadList];
     let backupServers = [...t2HackList];
@@ -112,32 +115,31 @@ export async function remoteHack(ns, tOwnedList, tDeadList, t2HackList) {
         let serverRam = ns.getServerMaxRam(server);
         let threads = Math.floor(serverRam / scriptRam);
         let serverIndex = index % targetServers.length;
-        let targetServer = targetServers[serverIndex];
-        let targetSecurity = ns.getServerMinSecurityLevel(targetServer) + 5;
-        let targetMoney = ns.getServerMaxMoney(targetServer) * 0.8;
+        let target = targetServers[serverIndex];
+        let targetSecurity = ns.getServerMinSecurityLevel(target) + 5;
+        let targetMoney = ns.getServerMaxMoney(target) * 0.8;
         let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
         payday = payday.toFixed(2)
         if (growRun == 1) {
-            targetSecurity = ns.getServerMinSecurityLevel(targetServer)
-            targetMoney = ns.getServerMaxMoney(targetServer)
+            targetSecurity = ns.getServerMinSecurityLevel(target)
+            targetMoney = ns.getServerMaxMoney(target)
             payday = "GROW"
         }
         await ns.scp(hackScript, "home", server);
         if (threads > 0) {
             textBufferServer = " ".repeat(18 - server.length);
             textBufferThread = " ".repeat(8 - threads.toString().length);
-            textBufferTarget = " ".repeat(18 - targetServer.length);
-            ns.tprint(`${server} ${textBufferServer}--->${textBufferThread} ${threads} threads  --->  ${targetServer} ${textBufferTarget} \$ ${payday}`);
-            ns.exec(hackScript, server, threads, targetServer, threads, targetSecurity, targetMoney);
+            textBufferTarget = " ".repeat(18 - target.length);
+            ns.tprint(`${server} ${textBufferServer}--->${textBufferThread} ${threads} threads  --->  ${target} ${textBufferTarget} \$ ${payday}`);
+            ns.exec(hackScript, server, threads, target, threads, targetSecurity, targetMoney);
         }
     }
 }
 
-
-
 // Sets all hackList servers to hack themselves, those which lack the RAM are unable to comply.
-export async function selfHack(ns, tHackList) {
+export async function selfHack(ns, tgrowTag, tHackList) {
     let targetServers = [...tHackList];
+    let growRun = tgrowTag;
     let hackScript = "hack.js";
     let scriptRam = ns.getScriptRam(hackScript);
     let textBufferTarget = 0;
@@ -150,11 +152,17 @@ export async function selfHack(ns, tHackList) {
         let targetSecurity = ns.getServerMinSecurityLevel(target) + 5;
         let targetMoney = ns.getServerMaxMoney(target) * 0.8;
         let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
+        payday = payday.toFixed(2)
+        if (growRun == 1) {
+            targetSecurity = ns.getServerMinSecurityLevel(target)
+            targetMoney = ns.getServerMaxMoney(target)
+            payday = "GROW"
+        }
         await ns.scp(hackScript, "home", target);
         if (threads > 0) {
             textBufferTarget = " ".repeat(18 - target.length);
             textBufferThread = " ".repeat(8 - threads.toString().length);
-            ns.tprint(`${target} ${textBufferTarget}--->${textBufferThread} ${threads} threads  --->  ${target} ${textBufferTarget} \$ ${payday.toFixed(2)}`);
+            ns.tprint(`${target} ${textBufferTarget}--->${textBufferThread} ${threads} threads  --->  ${target} ${textBufferTarget} \$ ${payday}`);
             ns.exec(hackScript, target, threads, target, threads, targetSecurity, targetMoney);
         }
     }
