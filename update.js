@@ -19,15 +19,13 @@ export async function main(ns, args) {
     var ownedList = ns.getPurchasedServers();
     serverList.add("home");
 
-    /*
-     * Start at home, look for servers, add them to list, itterate on list 
-     * until there are no servers left to check.
-     */
+    // Start at home, look for servers, add them to list, itterate on list 
+    // until there are no servers left to check.
     while (scanned.length > 0) {
-        const s = scanned.pop();
-        if (!serverList.has(s)) {
-            serverList.add(s);
-            scanned = scanned.concat(ns.scan(s));
+        const scannedServer = scanned.pop();
+        if (!serverList.has(scannedServer)) {
+            serverList.add(scannedServer);
+            scanned = scanned.concat(ns.scan(scannedServer));
         }
     }
     // Remove purchased servers & home from serverList
@@ -86,10 +84,8 @@ export async function main(ns, args) {
     ns.tprint(`============================================================================`);
 }
 
-/*
- * Divies up the deadList servers across my owned servers, 
- * starting mass threaded hacks on each. Inefficent, but effective.
- */
+// Divies up the deadList servers across my owned servers, 
+// starting mass threaded hacks on each. Inefficent, but effective.
 export async function remoteHack(ns, tOwnedList, tDeadList, t2HackList) {
     let myServers = [...tOwnedList];
     let growRun = 0;
@@ -168,10 +164,8 @@ export async function selfHack(ns, tgrowTag, tHackList) {
     }
 }
 
-/*
- * Takes in the server list, attempts gain root access to those it doesn't already have.
- * Returns the server list, minus all that were unable to be rooted. 
- */
+// Takes in the server list, attempts gain root access to those it doesn't already have.
+// Returns the server list, minus all that were unable to be rooted. 
 export async function rootHack(ns, tServerList) {
     let rootList = [];
     for (let i = 0; i < tServerList.length; i++) {
