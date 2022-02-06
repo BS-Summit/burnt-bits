@@ -135,7 +135,7 @@ export async function exampleMain(ns) {
 	var botList = [];
 	var rootedServerList = [];
 
-	let scanned = ns.scan("home");
+	var scanned = ns.scan("home");
 	var ownedList = ns.getPurchasedServers();
 	serverList.add("home");
 
