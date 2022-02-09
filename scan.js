@@ -1,195 +1,182 @@
 /** @param {NS} ns **/
-/*
- * Scans all available servers and attempts to root them. Will then cause those
- * which can hack themselves to do so, and instructs your available servers to 
- * hack those which cannot hack themselves, (or the original set if no dead 
- * servers are available.
- * args[0] if "grow" sets self-hacking servers to grow & weaken, over hacking themselves.
- */
+//	scan.js
+//	Scans all servers in the network, and collects information about them, including
+//	a breadcrumb trail usable to backtrace to the home server. 
+let serverList = new Object();
+let serverListKeys;
+let originServer;
+let currentServer;
+let serverInfo;
+let scanResults;
+let serverRoute = [];
+let backdoorMode = false;
+let testMode = false;
+let playerHackingLevel;
+
+function modeSelect(ns, userInput) {
+	userInput.forEach(mode => {
+		switch (mode) {
+			case 'bd':
+			case 'backdoor':
+				backdoorMode = true
+				break;
+			case 'test':
+				testMode = true
+				break;
+			default:
+				ns.tprint(`Sorry, ${mode} is not a recognized mode.`)
+		}
+	});
+}
+
+function testPrint(ns, printText) {
+	if (testMode) {
+		ns.tprint(printText)
+	}
+}
+
 export async function main(ns, args) {
-    var serverList = new Set();
-    var growTag = 0;
-    if (ns.args[0] == "grow") { growTag = 1 }
-    var hackList = [];
-    var deadList = [];
-    var botList = [];
-    var rootedServerList = [];
+	if (ns.args.length > 0) { modeSelect(ns, ns.args) }
 
-    let scanned = ns.scan("home");
-    var ownedList = ns.getPurchasedServers();
-    serverList.add("home");
+	playerHackingLevel = ns.getHackingLevel()
 
-    // Start at home, look for servers, add them to list, itterate on list 
-    // until there are no servers left to check.
-    while (scanned.length > 0) {
-        const scannedServer = scanned.pop();
-        if (!serverList.has(scannedServer)) {
-            serverList.add(scannedServer);
-            scanned = scanned.concat(ns.scan(scannedServer));
-        }
-    }
-    // Remove purchased servers & home from serverList
-    ownedList.forEach(serv => { serverList.delete(serv) })
-    serverList.delete("home");
-    serverList = Array.from(serverList);
+	//	Initiate home server.
+	originServer = null;
+	currentServer = "home";
+	serverInfo = serverDetails(ns, originServer, currentServer);
+	serverList[currentServer] = serverInfo;
 
-    // Gain root access to any servers that we can.
-    rootedServerList = (await rootHack(ns, serverList));
+	scanResults = ns.scan(currentServer);
+	let scanList = addOriginToScanned(ns, currentServer, scanResults);
 
-    // Remove servers we cannot hack yet.
-    for (let i = rootedServerList.length - 1; i >= 0; i--) {
-        if (ns.getServerRequiredHackingLevel(rootedServerList[i]) > ns.getHackingLevel()) {
-            rootedServerList.splice(i, 1);
-        }
-    }
-    // Create list of hackable servers which can be robbed from.
-    for (let i = rootedServerList.length - 1; i >= 0; i--) {
-        if (ns.getServerMaxMoney(rootedServerList[i]) > 0) {
-            hackList.push(rootedServerList[i]);
-        }
-    }
-    // Create sublist of hackable servers which hold money, but lack the RAM to self-hack.
-    for (let i = hackList.length - 1; i >= 0; i--) {
-        if (ns.getServerMaxRam(hackList[i]) == 0) {
-            deadList.push(hackList[i]);
-            hackList.splice(i, 1);
-        }
-    }
-    // Create a list of servers which have no money, but do have enough RAM to hack another server.
-    for (let i = rootedServerList.length - 1; i >= 0; i--) {
-        if (ns.getServerMaxRam(rootedServerList[i]) > 2 & ns.getServerMaxMoney(rootedServerList[i]) == 0) {
-            botList.push(rootedServerList[i]);
-        }
-    }
-    // Prints the Lists of servers for status checking.
-    ns.tprint(`============================================================================`);
-    ns.tprint(`Servers: ${serverList.length + ownedList.length}`);
-    ns.tprint(` Owned: ${ownedList.length}`);
-    ns.tprint(` Rooted Servers: ${rootedServerList.length}`);
-    ns.tprint(`  Dead Servers: ${deadList.length}`);
-    ns.tprint(`  Hack Servers: ${(hackList.length)}`);
-    ns.tprint(`  Bot Servers: ${botList.length}`);
-    ns.tprint(`============================================================================`);
-    ns.tprint(`Bot List:  ${botList.join(' ')}`);
-    ns.tprint(`----------------------------------------------------------------------------`);
-    await remoteHack(ns, botList, deadList, hackList)
-    ns.tprint(`============================================================================`);
-    ns.tprint(`Dead List:  ${deadList.join(' ')}`);
-    ns.tprint(`----------------------------------------------------------------------------`);
-    await remoteHack(ns, ownedList, deadList, hackList)
-    ns.tprint(`============================================================================`);
-    ns.tprint(`Hack List:  ${hackList.join(' ')}`);
-    ns.tprint(`----------------------------------------------------------------------------`);
-    await selfHack(ns, growTag, hackList)
-    ns.tprint(`============================================================================`);
+	recursiveScanning(ns, scanList)
+	serverListKeys = Object.keys(serverList)
+
+	testPrint(ns, `main -> serverListKeys.length: ${serverListKeys.length}`)
+
+	// rootServers(ns)
+	if (backdoorMode) { backdoorServers(ns) } //	Backdoor mode
 }
 
-// Divies up the deadList servers across my owned servers, 
-// starting mass threaded hacks on each. Inefficent, but effective.
-export async function remoteHack(ns, tOwnedList, tDeadList, t2HackList) {
-    let myServers = [...tOwnedList];
-    let growRun = 0;
-    if (myServers.length < 6) { growRun = 1 }
-    let targetServers = [...tDeadList];
-    let backupServers = [...t2HackList];
-    let hackScript = "hack.js";
-    let scriptRam = ns.getScriptRam(hackScript);
-    let textBufferTarget = 0;
-    let textBufferThread = 0;
-    let textBufferServer = 0;
-    if (targetServers.length == 0) {
-        if (backupServers.length > 0) {
-            targetServers = backupServers;
-            ns.tprint("No dead servers to hack, hacking backup list.");
-        } else {
-            ns.tprint("No servers able to be remote hacked.")
-            return (false)
-        }
-    }
-    for (const [index, server] of myServers.entries()) {
-        await ns.killall(server);
-        let serverRam = ns.getServerMaxRam(server);
-        let threads = Math.floor(serverRam / scriptRam);
-        let serverIndex = index % targetServers.length;
-        let target = targetServers[serverIndex];
-        let targetSecurity = ns.getServerMinSecurityLevel(target) + 5;
-        let targetMoney = ns.getServerMaxMoney(target) * 0.8;
-        let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
-        payday = payday.toFixed(2)
-        if (growRun == 1) {
-            targetSecurity = ns.getServerMinSecurityLevel(target)
-            targetMoney = ns.getServerMaxMoney(target)
-            payday = "GROW"
-        }
-        await ns.scp(hackScript, "home", server);
-        if (threads > 0) {
-            textBufferServer = " ".repeat(18 - server.length);
-            textBufferThread = " ".repeat(8 - threads.toString().length);
-            textBufferTarget = " ".repeat(18 - target.length);
-            ns.tprint(`${server} ${textBufferServer}--->${textBufferThread} ${threads} threads  --->  ${target} ${textBufferTarget} \$ ${payday}`);
-            ns.exec(hackScript, server, threads, target, threads, targetSecurity, targetMoney);
-        }
-    }
+//	Recursively scans and returns all servers on the network of the provided servers.
+function recursiveScanning(ns, scanList) {
+	if (scanList.length == 0) { return }
+	let serverArray = scanList.pop();
+	currentServer = serverArray[1]
+	//ns.tprint(["recursiveScanning : currentServer",currentServer])
+	if (!serverList[currentServer]) {
+		originServer = serverArray[0]
+		serverInfo = serverDetails(ns, originServer, currentServer);
+		serverList[currentServer] = serverInfo;
+		//ns.tprint(["recursiveScanning : IF : originServer",originServer])
+		scanResults = addOriginToScanned(ns, currentServer, ns.scan(currentServer))
+		scanList = scanList.concat(scanResults);
+	}
+	recursiveScanning(ns, scanList)
 }
 
-// Sets all hackList servers to hack themselves, those which lack the RAM are unable to comply.
-export async function selfHack(ns, tgrowTag, tHackList) {
-    let targetServers = [...tHackList];
-    let growRun = tgrowTag;
-    let hackScript = "hack.js";
-    let scriptRam = ns.getScriptRam(hackScript);
-    let textBufferTarget = 0;
-    let textBufferThread = 0;
-    for (let i = targetServers.length - 1; i >= 0; i--) {
-        let target = targetServers[i];
-        await ns.killall(target);
-        let targetRam = ns.getServerMaxRam(target);
-        let threads = Math.floor(targetRam / scriptRam);
-        let targetSecurity = ns.getServerMinSecurityLevel(target) + 5;
-        let targetMoney = ns.getServerMaxMoney(target) * 0.8;
-        let payday = Math.floor(Math.log(targetMoney / threads) * 100) / 100;
-        payday = payday.toFixed(2)
-        if (growRun == 1) {
-            targetSecurity = ns.getServerMinSecurityLevel(target)
-            targetMoney = ns.getServerMaxMoney(target)
-            payday = "GROW"
-        }
-        await ns.scp(hackScript, "home", target);
-        if (threads > 0) {
-            textBufferTarget = " ".repeat(18 - target.length);
-            textBufferThread = " ".repeat(8 - threads.toString().length);
-            ns.tprint(`${target} ${textBufferTarget}--->${textBufferThread} ${threads} threads  --->  ${target} ${textBufferTarget} \$ ${payday}`);
-            ns.exec(hackScript, target, threads, target, threads, targetSecurity, targetMoney);
-        }
-    }
+//	Collect server details and return as a dict.
+function serverDetails(ns, originServer, currentServer) {
+	var requiredPorts = ns.getServerNumPortsRequired(currentServer);
+	var rootStatus = ns.hasRootAccess(currentServer);
+	var requiredHackSkill = ns.getServerRequiredHackingLevel(currentServer);
+	var minimumSecurity = ns.getServerMinSecurityLevel(currentServer);
+	var maximumMoney = ns.getServerMaxMoney(currentServer);
+	var totalRam = ns.getServerMaxRam(currentServer);
+	var serverDetailsDict = {
+		OriginServer: originServer,
+		RequiredPorts: requiredPorts,
+		RootStatus: rootStatus,
+		RequiredHackSkill: requiredHackSkill,
+		BackdoorStatus: false,
+		MinimumSecurity: minimumSecurity,
+		MaximumMoney: maximumMoney,
+		TotalRam: totalRam
+	};
+	return (serverDetailsDict);
 }
 
-// Takes in the server list, attempts gain root access to those it doesn't already have.
-// Returns the server list, minus all that were unable to be rooted. 
-export async function rootHack(ns, tServerList) {
-    let rootList = [];
-    for (let i = 0; i < tServerList.length; i++) {
-        let serv = tServerList[i];
-        if (ns.serverExists(serv) & ns.hasRootAccess(serv) == false) rootList.push(serv);
-    }
-    for (let i = rootList.length - 1; i >= 0; i--) {
-        let target = rootList[i];
-        let t = ns.getServerNumPortsRequired(target);
-        let d = 0;
-        if (ns.fileExists('BruteSSH.exe')) { ns.brutessh(target); d++ }
-        if (ns.fileExists('FTPCrack.exe')) { ns.ftpcrack(target); d++ }
-        if (ns.fileExists('relaySMTP.exe')) { ns.relaysmtp(target); d++ }
-        if (ns.fileExists('HTTPWorm.exe')) { ns.httpworm(target); d++ }
-        if (ns.fileExists('SQLInject.exe')) { ns.sqlinject(target); d++ }
-        if (t <= d) {
-            ns.nuke(target);
-            ns.tprint(`${target} rooted.`);
-        } else {
-            ns.tprint(`${target} requires ${t - d} more root tools.`);
-            let remove = tServerList.indexOf(target);
-            if (remove > -1) { tServerList.splice(remove, 1); }
-        }
+//	Takes the origin server and an array of results from a scan, then returns an
+//	array of paired arrays including the origin server and the scanned servers.
+function addOriginToScanned(ns, originServer, scanResults) {
+	//ns.tprint(["addOriginToScanned : scanResults", scanResults]) //	Testing print
+	var resultsList = []
+	for (let scannedServer of scanResults) {
+		resultsList.push([originServer, scannedServer])
+	}
+	//ns.tprint(["addOriginToScanned : resultsList", resultsList]) //	Testing print
+	return (resultsList)
+}
 
-    }
-    return (tServerList);
+function rootServers(ns) {
+	let portOpenerList = ['BruteSSH.exe', 'FTPCrack.exe', 'relaySMTP.exe', 'HTTPWorm.exe', 'SQLInject.exe']
+	for (let indexPortOpeners = portOpenerList.length - 1; indexPortOpeners >= 0; indexPortOpeners--) {
+		if (!ns.fileExists(portOpenerList[indexPortOpeners], "home")) {
+			portOpenerList.splice(indexPortOpeners, 1)
+		}
+	}
+	let numberOfOpeners = portOpenerList.length;
+	let rootedServers = []
+	let unrootedServers = []
+
+	for (let indexOfKeys = 0; indexOfKeys < serverListKeys.length; indexOfKeys++) {
+		let server = serverListKeys[indexOfKeys];
+		if (!serverList[server].RootStatus) {
+			if (serverList[server].RequiredPorts <= numberOfOpeners) {
+				portOpenerList.forEach(program => {
+					ns[`${program.split(".")[0].toLowerCase()}`](server)
+				});
+				ns.nuke(server)
+				serverList[server].RootStatus = true;
+				rootedServers.push(server)
+			} else {
+				unrootedServers.push(server)
+			}
+		} else {
+			rootedServers.push(server)
+		}
+	}
+	ns.tprint(`Rooted Servers: ${rootedServers}`);
+	ns.tprint(`Unrooted Servers: ${unrootedServers}`);
+}
+
+//	Backdoor all servers
+function backdoorServers(ns) {
+	let testerServer = ["CSEC", "avmnite-02h", "I.I.I.I"] // Testing variables
+	//serverListKeys.forEach(server => { 
+	testerServer.forEach(server => { //	Testing setup
+		//if (serverList[server].RootStatus && 
+		//	serverList[server].RequiredHackSkill <= playerHackingLevel  && 
+		//	!serverList[server].BackdoorStatus)
+		//) {
+		if (true) { //	Testing setup
+			let routeToFollow = routeToServer(ns, server);
+			testPrint(ns, `Starting from "home"`) // Testing text
+			testPrint(ns, `Route to Follow: ${routeToFollow}`) // Testing text
+			routeToFollow.forEach(stepForward => {
+				if (stepForward == routeToFollow[0]) return;
+				testPrint(ns, `Connecting to -> ${stepForward}`) // Testing text
+				//ns.connect(stepForward)
+			});
+			testPrint(ns, `Backdooring ${server}`) // Testing text
+			//ns.installBackdoor()
+			while (routeToFollow.length > 0) {
+				let stepBack = routeToFollow.pop()
+				if (stepBack == server) continue;
+				testPrint(ns, `Connecting back to -> ${stepBack}`) // Testing text
+				//ns.connect(stepBack)
+			}
+		}
+	});
+}
+
+//	Find the route to a given server
+function routeToServer(ns, server) {
+	serverRoute.push(server)
+	if (server == "home") {
+		let routeOutput = serverRoute.reverse()
+		serverRoute = []
+		return (routeOutput)
+	}
+	return (routeToServer(ns, serverList[server].OriginServer))
 }
