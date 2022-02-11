@@ -15,9 +15,9 @@ let playerHackingLevel;
 /** @param {NS} ns **/
 export async function main(ns, args) {
     if (ns.args.length > 0) { modeSelect(ns, ns.args) }
-    ns.tprint(`backdoorMode = ${backdoorMode}`)
-    ns.tprint(`testMode = ${testMode}`)
-    playerHackingLevel = ns.getHackingLevel()
+    ns.tprint(`backdoorMode = ${backdoorMode}`);
+    ns.tprint(`testMode = ${testMode}`);
+    playerHackingLevel = ns.getHackingLevel();
 
     //  Initiate home server.
     originServer = null;
@@ -28,15 +28,15 @@ export async function main(ns, args) {
     scanResults = ns.scan(currentServer);
     let scanList = addOriginToScanned(ns, currentServer, scanResults);
 
-    await recursiveScanning(ns, scanList)
-    serverListKeys = Object.keys(serverList)
+    await recursiveScanning(ns, scanList);
+    serverListKeys = Object.keys(serverList);
 
-    await testPrint(ns, `main -> serverListKeys.length: ${serverListKeys.length}`)
+    await testPrint(ns, `main -> serverListKeys.length: ${serverListKeys.length}`);
 
     await rootServers(ns) // Root all available servers.
     if (backdoorMode) { await backdoorServers(ns) } //  Backdoor mode: Backdoor all available servers.
 
-    await testPrint(ns, "After backdoorServers check.") // Test text
+    await testPrint(ns, "After backdoorServers check."); // Test text
 }
 
 /** @param {NS} ns **/
@@ -45,13 +45,13 @@ function modeSelect(ns, userInput) {
         switch (mode) {
             case 'bd':
             case 'backdoor':
-                backdoorMode = true
+                backdoorMode = true;
                 break;
             case 'test':
-                testMode = true
+                testMode = true;
                 break;
             default:
-                ns.tprint(`Sorry, ${mode} is not a recognized mode.`)
+                ns.tprint(`Sorry, ${mode} is not a recognized mode.`);
         }
     });
 }
@@ -59,7 +59,7 @@ function modeSelect(ns, userInput) {
 /** @param {NS} ns **/
 async function testPrint(ns, printText) {
     if (testMode) {
-        ns.tprint(printText)
+        ns.tprint(printText);
     }
 }
 
@@ -68,17 +68,17 @@ async function testPrint(ns, printText) {
 async function recursiveScanning(ns, scanList) {
     if (scanList.length == 0) { return }
     let serverArray = scanList.pop();
-    currentServer = serverArray[1]
+    currentServer = serverArray[1];
     //ns.tprint(["recursiveScanning : currentServer",currentServer])
     if (!serverList[currentServer]) {
-        originServer = serverArray[0]
+        originServer = serverArray[0];
         serverInfo = serverDetails(ns, originServer, currentServer);
         serverList[currentServer] = serverInfo;
         //ns.tprint(["recursiveScanning : IF : originServer",originServer])
-        scanResults = addOriginToScanned(ns, currentServer, ns.scan(currentServer))
+        scanResults = addOriginToScanned(ns, currentServer, ns.scan(currentServer));
         scanList = scanList.concat(scanResults);
     }
-    recursiveScanning(ns, scanList)
+    recursiveScanning(ns, scanList);
 }
 
 //  Collect server details and return as a dict.
@@ -125,8 +125,8 @@ async function rootServers(ns) {
         }
     }
     let numberOfOpeners = portOpenerList.length;
-    let rootedServers = []
-    let unrootedServers = []
+    let rootedServers = [];
+    let unrootedServers = [];
 
     for (let indexOfKeys = 0; indexOfKeys < serverListKeys.length; indexOfKeys++) {
         let server = serverListKeys[indexOfKeys];
@@ -136,7 +136,7 @@ async function rootServers(ns) {
                     ns[`${program.split(".")[0].toLowerCase()}`](server)
                 });
                 ns.nuke(server)
-                serverList[server].RootStatus = true;
+                serverList[server].RootStatus = ns.hasRootAccess(server);;
                 rootedServers.push(server)
             } else {
                 unrootedServers.push(server)
@@ -165,7 +165,7 @@ async function backdoorServers(ns) {
                 ns.connect(stepForward)
             }
             //  Set buffer to account for variable runtimes.
-            let timeBuffer = 1000
+            let timeBuffer = 200
             let backdoorInstallTime = ((ns.getHackTime(server) / 4) + timeBuffer)
 
             ns.tprint(`Backdooring ${server}. Time estimate ~${backdoorInstallTime}`)
@@ -173,6 +173,7 @@ async function backdoorServers(ns) {
             await ns.installBackdoor()
 
             await ns.asleep(backdoorInstallTime)
+            serverList[server].BackdoorStatus = true;
 
             while (routeToFollow.length > 0) {
                 let stepBack = routeToFollow.pop()
