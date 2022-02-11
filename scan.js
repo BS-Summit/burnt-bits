@@ -1,7 +1,6 @@
-/** @param {NS} ns **/
-//	scan.js
-//	Scans all servers in the network, and collects information about them, including
-//	a breadcrumb trail usable to backtrace to the home server. 
+//  scan.js
+//  Scans all servers in the network, and collects information about them, including
+//  a breadcrumb trail usable to backtrace to the home server. 
 let serverList = new Object();
 let serverListKeys;
 let originServer;
@@ -13,170 +12,186 @@ let backdoorMode = false;
 let testMode = false;
 let playerHackingLevel;
 
-function modeSelect(ns, userInput) {
-	userInput.forEach(mode => {
-		switch (mode) {
-			case 'bd':
-			case 'backdoor':
-				backdoorMode = true
-				break;
-			case 'test':
-				testMode = true
-				break;
-			default:
-				ns.tprint(`Sorry, ${mode} is not a recognized mode.`)
-		}
-	});
-}
-
-function testPrint(ns, printText) {
-	if (testMode) {
-		ns.tprint(printText)
-	}
-}
-
+/** @param {NS} ns **/
 export async function main(ns, args) {
-	if (ns.args.length > 0) { modeSelect(ns, ns.args) }
+    if (ns.args.length > 0) { modeSelect(ns, ns.args) }
+    ns.tprint(`backdoorMode = ${backdoorMode}`)
+    ns.tprint(`testMode = ${testMode}`)
+    playerHackingLevel = ns.getHackingLevel()
 
-	playerHackingLevel = ns.getHackingLevel()
+    //  Initiate home server.
+    originServer = null;
+    currentServer = "home";
+    serverInfo = serverDetails(ns, originServer, currentServer);
+    serverList[currentServer] = serverInfo;
+    serverList[currentServer].BackdoorStatus = true;
+    scanResults = ns.scan(currentServer);
+    let scanList = addOriginToScanned(ns, currentServer, scanResults);
 
-	//	Initiate home server.
-	originServer = null;
-	currentServer = "home";
-	serverInfo = serverDetails(ns, originServer, currentServer);
-	serverList[currentServer] = serverInfo;
+    await recursiveScanning(ns, scanList)
+    serverListKeys = Object.keys(serverList)
 
-	scanResults = ns.scan(currentServer);
-	let scanList = addOriginToScanned(ns, currentServer, scanResults);
+    await testPrint(ns, `main -> serverListKeys.length: ${serverListKeys.length}`)
 
-	recursiveScanning(ns, scanList)
-	serverListKeys = Object.keys(serverList)
+    await rootServers(ns) // Root all available servers.
+    if (backdoorMode) { await backdoorServers(ns) } //  Backdoor mode: Backdoor all available servers.
 
-	testPrint(ns, `main -> serverListKeys.length: ${serverListKeys.length}`)
-
-	// rootServers(ns)
-	if (backdoorMode) { backdoorServers(ns) } //	Backdoor mode
+    await testPrint(ns, "After backdoorServers check.") // Test text
 }
 
-//	Recursively scans and returns all servers on the network of the provided servers.
-function recursiveScanning(ns, scanList) {
-	if (scanList.length == 0) { return }
-	let serverArray = scanList.pop();
-	currentServer = serverArray[1]
-	//ns.tprint(["recursiveScanning : currentServer",currentServer])
-	if (!serverList[currentServer]) {
-		originServer = serverArray[0]
-		serverInfo = serverDetails(ns, originServer, currentServer);
-		serverList[currentServer] = serverInfo;
-		//ns.tprint(["recursiveScanning : IF : originServer",originServer])
-		scanResults = addOriginToScanned(ns, currentServer, ns.scan(currentServer))
-		scanList = scanList.concat(scanResults);
-	}
-	recursiveScanning(ns, scanList)
+/** @param {NS} ns **/
+function modeSelect(ns, userInput) {
+    userInput.forEach(mode => {
+        switch (mode) {
+            case 'bd':
+            case 'backdoor':
+                backdoorMode = true
+                break;
+            case 'test':
+                testMode = true
+                break;
+            default:
+                ns.tprint(`Sorry, ${mode} is not a recognized mode.`)
+        }
+    });
 }
 
-//	Collect server details and return as a dict.
+/** @param {NS} ns **/
+async function testPrint(ns, printText) {
+    if (testMode) {
+        ns.tprint(printText)
+    }
+}
+
+//  Recursively scans and returns all servers on the network of the provided servers.
+/** @param {NS} ns **/
+async function recursiveScanning(ns, scanList) {
+    if (scanList.length == 0) { return }
+    let serverArray = scanList.pop();
+    currentServer = serverArray[1]
+    //ns.tprint(["recursiveScanning : currentServer",currentServer])
+    if (!serverList[currentServer]) {
+        originServer = serverArray[0]
+        serverInfo = serverDetails(ns, originServer, currentServer);
+        serverList[currentServer] = serverInfo;
+        //ns.tprint(["recursiveScanning : IF : originServer",originServer])
+        scanResults = addOriginToScanned(ns, currentServer, ns.scan(currentServer))
+        scanList = scanList.concat(scanResults);
+    }
+    recursiveScanning(ns, scanList)
+}
+
+//  Collect server details and return as a dict.
+/** @param {NS} ns **/
 function serverDetails(ns, originServer, currentServer) {
-	var requiredPorts = ns.getServerNumPortsRequired(currentServer);
-	var rootStatus = ns.hasRootAccess(currentServer);
-	var requiredHackSkill = ns.getServerRequiredHackingLevel(currentServer);
-	var minimumSecurity = ns.getServerMinSecurityLevel(currentServer);
-	var maximumMoney = ns.getServerMaxMoney(currentServer);
-	var totalRam = ns.getServerMaxRam(currentServer);
-	var serverDetailsDict = {
-		OriginServer: originServer,
-		RequiredPorts: requiredPorts,
-		RootStatus: rootStatus,
-		RequiredHackSkill: requiredHackSkill,
-		BackdoorStatus: false,
-		MinimumSecurity: minimumSecurity,
-		MaximumMoney: maximumMoney,
-		TotalRam: totalRam
-	};
-	return (serverDetailsDict);
+    var requiredPorts = ns.getServerNumPortsRequired(currentServer);
+    var rootStatus = ns.hasRootAccess(currentServer);
+    var requiredHackSkill = ns.getServerRequiredHackingLevel(currentServer);
+    var minimumSecurity = ns.getServerMinSecurityLevel(currentServer);
+    var maximumMoney = ns.getServerMaxMoney(currentServer);
+    var totalRam = ns.getServerMaxRam(currentServer);
+    var serverDetailsDict = {
+        OriginServer: originServer,
+        RequiredPorts: requiredPorts,
+        RootStatus: rootStatus,
+        RequiredHackSkill: requiredHackSkill,
+        BackdoorStatus: false,
+        MinimumSecurity: minimumSecurity,
+        MaximumMoney: maximumMoney,
+        TotalRam: totalRam
+    };
+    return (serverDetailsDict);
 }
 
-//	Takes the origin server and an array of results from a scan, then returns an
-//	array of paired arrays including the origin server and the scanned servers.
+//  Takes the origin server and an array of results from a scan, then returns an
+//  array of paired arrays including the origin server and the scanned servers.
+/** @param {NS} ns **/
 function addOriginToScanned(ns, originServer, scanResults) {
-	//ns.tprint(["addOriginToScanned : scanResults", scanResults]) //	Testing print
-	var resultsList = []
-	for (let scannedServer of scanResults) {
-		resultsList.push([originServer, scannedServer])
-	}
-	//ns.tprint(["addOriginToScanned : resultsList", resultsList]) //	Testing print
-	return (resultsList)
+    //ns.tprint(["addOriginToScanned : scanResults", scanResults]) //   Testing print
+    var resultsList = []
+    for (let scannedServer of scanResults) {
+        resultsList.push([originServer, scannedServer])
+    }
+    //ns.tprint(["addOriginToScanned : resultsList", resultsList]) //   Testing print
+    return (resultsList)
 }
 
-function rootServers(ns) {
-	let portOpenerList = ['BruteSSH.exe', 'FTPCrack.exe', 'relaySMTP.exe', 'HTTPWorm.exe', 'SQLInject.exe']
-	for (let indexPortOpeners = portOpenerList.length - 1; indexPortOpeners >= 0; indexPortOpeners--) {
-		if (!ns.fileExists(portOpenerList[indexPortOpeners], "home")) {
-			portOpenerList.splice(indexPortOpeners, 1)
-		}
-	}
-	let numberOfOpeners = portOpenerList.length;
-	let rootedServers = []
-	let unrootedServers = []
+/** @param {NS} ns **/
+async function rootServers(ns) {
+    let portOpenerList = ['BruteSSH.exe', 'FTPCrack.exe', 'relaySMTP.exe', 'HTTPWorm.exe', 'SQLInject.exe']
+    for (let indexPortOpeners = portOpenerList.length - 1; indexPortOpeners >= 0; indexPortOpeners--) {
+        if (!ns.fileExists(portOpenerList[indexPortOpeners], "home")) {
+            portOpenerList.splice(indexPortOpeners, 1)
+        }
+    }
+    let numberOfOpeners = portOpenerList.length;
+    let rootedServers = []
+    let unrootedServers = []
 
-	for (let indexOfKeys = 0; indexOfKeys < serverListKeys.length; indexOfKeys++) {
-		let server = serverListKeys[indexOfKeys];
-		if (!serverList[server].RootStatus) {
-			if (serverList[server].RequiredPorts <= numberOfOpeners) {
-				portOpenerList.forEach(program => {
-					ns[`${program.split(".")[0].toLowerCase()}`](server)
-				});
-				ns.nuke(server)
-				serverList[server].RootStatus = true;
-				rootedServers.push(server)
-			} else {
-				unrootedServers.push(server)
-			}
-		} else {
-			rootedServers.push(server)
-		}
-	}
-	ns.tprint(`Rooted Servers: ${rootedServers}`);
-	ns.tprint(`Unrooted Servers: ${unrootedServers}`);
+    for (let indexOfKeys = 0; indexOfKeys < serverListKeys.length; indexOfKeys++) {
+        let server = serverListKeys[indexOfKeys];
+        if (!serverList[server].RootStatus) {
+            if (serverList[server].RequiredPorts <= numberOfOpeners) {
+                portOpenerList.forEach(program => {
+                    ns[`${program.split(".")[0].toLowerCase()}`](server)
+                });
+                ns.nuke(server)
+                serverList[server].RootStatus = true;
+                rootedServers.push(server)
+            } else {
+                unrootedServers.push(server)
+            }
+        } else {
+            rootedServers.push(server)
+        }
+    }
+    ns.tprint(`Rooted Servers: ${rootedServers}`);
+    ns.tprint(`Unrooted Servers: ${unrootedServers}`);
 }
 
-//	Backdoor all servers
-function backdoorServers(ns) {
-	let testerServer = ["CSEC", "avmnite-02h", "I.I.I.I"] // Testing variables
-	//serverListKeys.forEach(server => { 
-	testerServer.forEach(server => { //	Testing setup
-		//if (serverList[server].RootStatus && 
-		//	serverList[server].RequiredHackSkill <= playerHackingLevel  && 
-		//	!serverList[server].BackdoorStatus)
-		//) {
-		if (true) { //	Testing setup
-			let routeToFollow = routeToServer(ns, server);
-			testPrint(ns, `Starting from "home"`) // Testing text
-			testPrint(ns, `Route to Follow: ${routeToFollow}`) // Testing text
-			routeToFollow.forEach(stepForward => {
-				if (stepForward == routeToFollow[0]) return;
-				testPrint(ns, `Connecting to -> ${stepForward}`) // Testing text
-				//ns.connect(stepForward)
-			});
-			testPrint(ns, `Backdooring ${server}`) // Testing text
-			//ns.installBackdoor()
-			while (routeToFollow.length > 0) {
-				let stepBack = routeToFollow.pop()
-				if (stepBack == server) continue;
-				testPrint(ns, `Connecting back to -> ${stepBack}`) // Testing text
-				//ns.connect(stepBack)
-			}
-		}
-	});
+//  Backdoor all applicable servers.
+/** @param {NS} ns **/
+async function backdoorServers(ns) {
+    for (const server of serverListKeys) {
+        if (serverList[server].RootStatus &&
+            serverList[server].RequiredHackSkill <= playerHackingLevel &&
+            !serverList[server].BackdoorStatus) {
+            let routeToFollow = routeToServer(ns, server);
+            await testPrint(ns, `Starting from "home"`) // Testing text
+            await testPrint(ns, `Route to Follow: ${routeToFollow}`) // Testing text
+            for (const stepForward of routeToFollow) {
+                if (stepForward == routeToFollow[0]) continue;
+                await testPrint(ns, `Connecting to -> ${stepForward}`) // Testing text
+                ns.connect(stepForward)
+            }
+            //  Set buffer to account for variable runtimes.
+            let timeBuffer = 1000
+            let backdoorInstallTime = ((ns.getHackTime(server) / 4) + timeBuffer)
+
+            ns.tprint(`Backdooring ${server}. Time estimate ~${backdoorInstallTime}`)
+
+            await ns.installBackdoor()
+
+            await ns.asleep(backdoorInstallTime)
+
+            while (routeToFollow.length > 0) {
+                let stepBack = routeToFollow.pop()
+                if (stepBack == server) continue;
+                await testPrint(ns, `Connecting back to -> ${stepBack}`) // Testing text
+                ns.connect(stepBack)
+            }
+        }
+    }
 }
 
-//	Find the route to a given server
+//  Find the route to a given server
+/** @param {NS} ns **/
 function routeToServer(ns, server) {
-	serverRoute.push(server)
-	if (server == "home") {
-		let routeOutput = serverRoute.reverse()
-		serverRoute = []
-		return (routeOutput)
-	}
-	return (routeToServer(ns, serverList[server].OriginServer))
+    serverRoute.push(server)
+    if (server == "home") {
+        let routeOutput = serverRoute.reverse()
+        serverRoute = []
+        return (routeOutput)
+    }
+    return (routeToServer(ns, serverList[server].OriginServer))
 }
