@@ -184,8 +184,8 @@ async function backdoorServers(ns) {
 
             await ns.installBackdoor()
             await ns.asleep(backdoorInstallTime)
-            await ns.scp("bdComplete.js", "home", currentServer)
-            if (ns.fileExists("bdComplete.js", currentServer)) {
+            await ns.scp("bdComplete.js", "home", server)
+            if (ns.fileExists("bdComplete.js", server)) {
                 serverList[server].BackdoorStatus = true;
                 ns.tprint(`Backdooring ${server} successful.`)
             } else { ns.tprint(`Backdooring ${server} unsuccessful.`) }
