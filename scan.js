@@ -22,15 +22,16 @@ export async function main(ns, args) {
     //  Initiate home server.
     originServer = null;
     currentServer = "home";
+    if (!ns.fileExists("bdComplete.js", currentServer)) { ns.tprint("bdComplete.js missing, please create.") }
     serverInfo = serverDetails(ns, originServer, currentServer);
     serverList[currentServer] = serverInfo;
-    serverList[currentServer].BackdoorStatus = true;
     scanResults = ns.scan(currentServer);
     let scanList = addOriginToScanned(ns, currentServer, scanResults);
 
     await recursiveScanning(ns, scanList);
     serverListKeys = Object.keys(serverList);
 
+    await markOwnedServers(ns);
     await testPrint(ns, `main -> serverListKeys.length: ${serverListKeys.length}`);
 
     await rootServers(ns) // Root all available servers.
@@ -63,6 +64,16 @@ async function testPrint(ns, printText) {
     }
 }
 
+/** @param {NS} ns **/
+async function markOwnedServers(ns) {
+    let ownedServers = ns.getPurchasedServers()
+    for (const eachServer of ownedServers) {
+        if (serverList[eachServer].BackdoorStatus == true) { continue }
+        await ns.scp("bdComplete.js", "home", eachServer)
+        serverList[eachServer].BackdoorStatus = true;
+    }
+}
+
 //  Recursively scans and returns all servers on the network of the provided servers.
 /** @param {NS} ns **/
 async function recursiveScanning(ns, scanList) {
@@ -90,12 +101,13 @@ function serverDetails(ns, originServer, currentServer) {
     var minimumSecurity = ns.getServerMinSecurityLevel(currentServer);
     var maximumMoney = ns.getServerMaxMoney(currentServer);
     var totalRam = ns.getServerMaxRam(currentServer);
+    var backdoorStatus = ns.fileExists("bdComplete.js", currentServer)
     var serverDetailsDict = {
         OriginServer: originServer,
         RequiredPorts: requiredPorts,
         RootStatus: rootStatus,
         RequiredHackSkill: requiredHackSkill,
-        BackdoorStatus: false,
+        BackdoorStatus: backdoorStatus,
         MinimumSecurity: minimumSecurity,
         MaximumMoney: maximumMoney,
         TotalRam: totalRam
@@ -136,7 +148,7 @@ async function rootServers(ns) {
                     ns[`${program.split(".")[0].toLowerCase()}`](server)
                 });
                 ns.nuke(server)
-                serverList[server].RootStatus = ns.hasRootAccess(server);;
+                serverList[server].RootStatus = ns.hasRootAccess(server);
                 rootedServers.push(server)
             } else {
                 unrootedServers.push(server)
@@ -155,26 +167,30 @@ async function backdoorServers(ns) {
     for (const server of serverListKeys) {
         if (serverList[server].RootStatus &&
             serverList[server].RequiredHackSkill <= playerHackingLevel &&
-            !serverList[server].BackdoorStatus) {
+            serverList[server].BackdoorStatus === false) {
             let routeToFollow = routeToServer(ns, server);
-            await testPrint(ns, `Starting from "home"`) // Testing text
-            await testPrint(ns, `Route to Follow: ${routeToFollow}`) // Testing text
+            await testPrint(ns, `Starting from "home"`); // Testing text
+            await testPrint(ns, `Route to Follow: ${routeToFollow}`); // Testing text
             for (const stepForward of routeToFollow) {
                 if (stepForward == routeToFollow[0]) continue;
-                await testPrint(ns, `Connecting to -> ${stepForward}`) // Testing text
+                await testPrint(ns, `Connecting to -> ${stepForward}`); // Testing text
                 ns.connect(stepForward)
             }
             //  Set buffer to account for variable runtimes.
-            let timeBuffer = 200
+            let timeBuffer = 200;
             let backdoorInstallTime = ((ns.getHackTime(server) / 4) + timeBuffer)
 
             ns.tprint(`Backdooring ${server}. Time estimate ~${backdoorInstallTime}`)
 
             await ns.installBackdoor()
-
             await ns.asleep(backdoorInstallTime)
-            serverList[server].BackdoorStatus = true;
+            await ns.scp("bdComplete.js", "home", currentServer)
+            if (ns.fileExists("bdComplete.js", currentServer)) {
+                serverList[server].BackdoorStatus = true;
+                ns.tprint(`Backdooring ${server} successful.`)
+            } else { ns.tprint(`Backdooring ${server} unsuccessful.`) }
 
+            ns.tprint(serverList[server])
             while (routeToFollow.length > 0) {
                 let stepBack = routeToFollow.pop()
                 if (stepBack == server) continue;
