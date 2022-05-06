@@ -206,7 +206,7 @@ async function purchaseBestUpgrade(ns) {
         `);
         ns.exit();
     }
-    if (cost * 2 > nodeCost) {
+    if ((cost * 2) > nodeCost) {
         await waitForCash(ns, nodeCost);
         ns.hacknet.purchaseNode();
     }
