@@ -1,111 +1,245 @@
+let myGang = [];
+let gangMembers = [];
+let ascensionTime = 0; // Tracks last Ascension time
+let loop = false; // Determines if we loop infinitely, or once.
+const MaxGangSize = 12 // The maximum number of gangmembers you can have.
+const WantedLevelBase = 1; // Default minimum Wanted Level
+const WantedPenaltyMin = 0.95; // 95% Production, 5% penalty
+const WarfareMult = 2; // 2x Opponent Power
+const SleepTime = 5000; // 5 seconds
+const FullTerritory = 1; // 100% Territory
+const MinAscension = 10;
+const AscensionTimer = 300000; // Every 5 minutes
+const ExitTime = 200; // Time before exiting, to let code complete.
+const LaunchOptions = ["loop", "once", "equip", "ascend", "work"];
+
 /** @param {NS} ns **/
-var refreshRate = 1000; // 1 seconds
-var gangMemberList = new Object();
-var trainingGangMembers = [];
-var workingGangMembers = [];
-var vigilanteGangMembers = [];
 export async function main(ns) {
-	var gangMembers = ns.gang.getMemberNames();
-	ns.tprint(gangMembers)
-	if (initializeMembers(ns, gangMembers)) {
-		ns.tprint("Done")
+	ns.disableLog("ALL");
+	if (ns.args.length < 1) {
+		await unusableInput(ns);
 	}
-}
-
-
-export async function initializeMembers(ns, newRecruits) {
-	var workSheet = {
-		CurrentTask: null,
-		TrainingTask: null,
-		WorkTask: null,
-		VigilanteTask: null
-	};
-	ns.tprint(newRecruits)
-	ns.tprint(newRecruits.length)
-	ns.tprint(workSheet)
-	//	Add each newRecruit to the gangMemberList with their individual workSheet.
-	//	Then initialize their task assignments and shift them to Training.
-	for (let recruitIndex = 0; recruitIndex < newRecruits.length; i++) {
-		let gangMember = newRecruits[recruitIndex];
-		gangMemberList.gangMember = Object.create(workSheet);
-		gangMemberList.gangMember[TrainingTask] = "Train Combat";
-		gangMemberList.gangMember[WorkTask] = "Mug People";
-		gangMemberList.gangMember[VigilanteTask] = "Vigilante Justice";
-		ns.tprint("why")
-		ns.tprint(recruitIndex)
-		ns.tprint(gangMember)
-		ns.tprint(gangMemberList[gangMember])
-		await trainingShift(ns, gangMember);
-	}
-	//	Available Combat Tasks:
-	//	["Unassigned","Mug People","Deal Drugs","Strongarm Civilians","Run a Con",
-	//	"Armed Robbery","Traffick Illegal Arms","Threaten & Blackmail","Human Trafficking",
-	//	"Terrorism","Vigilante Justice","Train Combat","Train Hacking","Train Charisma",
-	//	"Territory Warfare"]
-	//	Available Hacking Tasks:
-	//	["Unassigned","Mug People","Deal Drugs","Strongarm Civilians","Run a Con",
-	//	"Armed Robbery","Traffick Illegal Arms","Threaten & Blackmail","Human Trafficking",
-	//	"Terrorism","Vigilante Justice","Train Combat","Train Hacking","Train Charisma",
-	//	"Territory Warfare"]
-	return (true)
-}
-
-//	Updates a gang member's current task to a new task and moves them into their
-//	new task's group.
-export async function updateWorkerLists(ns, gangMember, newTask) {
-	let currentTask = gangMemberList.gangMember[CurrentTask];
-	let trainingTask = gangMemberList.gangMember[TrainingTask];
-	let workTask = gangMemberList.gangMember[WorkTask];
-	let vigilanteTask = gangMemberList.gangMember[VigilanteTask];
-	//	Remove the gang member from their previous task list.
-	if (currentTask == trainingTask) {
-		let gangMemberIndex = trainingGangMembers.indexOf(gangMember);
-		trainingGangMembers.splice(gangMemberIndex, 1);
-	} else if (currentTask == workTask) {
-		let gangMemberIndex = workingGangMembers.indexOf(gangMember);
-		workingGangMembers.splice(gangMemberIndex, 1);
-	} else if (currentTask == vigilanteTask) {
-		let gangMemberIndex = vigilanteGangMembers.indexOf(gangMember);
-		vigilanteGangMembers.splice(gangMemberIndex, 1);
+	ns.tail();
+	let userInput = ns.args[0];
+	if (await isOptionAvailable(ns, userInput)) {
+		myGang = ns.gang.getGangInformation();
+		gangMembers = ns.gang.getMemberNames();
+		await optionSelect(ns, userInput);
 	} else {
-		return (ns.tprint(`updateWorkerLists currentTask mismatch Error: ${gangMember}, 
-				${newTask}, ${currentTask}, ${trainingTask}, ${workTask}, ${vigilanteTask}`));
+		ns.print(`Unexpected error. No valid command.`);
 	}
-	//	Add the gang member to their new task list.
-	if (newTask == trainingTask) {
-		trainingGangMembers.push(gangMember);
-	} else if (newTask == workTask) {
-		workingGangMembers.push(gangMember);
-	} else if (newTask == vigilanteTask) {
-		vigilanteGangMembers.push(gangMember);
-	} else {
-		return (ns.tprint(`updateWorkerLists newTask mismatch Error: ${gangMember}, 
-				${newTask}, ${currentTask}, ${trainingTask}, ${workTask}, ${vigilanteTask}`));
-	}
-	//	Update the gang member's current task.
-	gangMemberList.gangMember[CurrentTask] = newTask;
-	return (true)
 }
 
-//	Shifts a gang member's assignment to training, working, vigilante-ing.
-export async function trainingShift(ns, gangMember) {
-	if (ns.gang.setMemberTask(gangMember, gangMemberList.gangMember[TrainingTask])) {
-		await updateWorkerLists(gangMember, gangMemberList.gangMember[TrainingTask])
-		return (true);
-	}
-	return (false);
+/** @param {NS} ns **/
+async function unusableInput(ns) {
+	unusableInputMsg = `Available arguments: ${LaunchOptions.join(", ")}`;
+	await exitScript(ns, unusableInputMsg);
 }
-export async function workShift(ns, gangMember) {
-	if (ns.gang.setMemberTask(gangMember, gangMemberList.gangMember[WorkTask])) {
-		await updateWorkerLists(gangMember, gangMemberList.gangMember[WorkTask])
-		return (true);
-	}
-	return (false);
+
+async function exitScript(ns, exitMsg) {
+	ns.tprint(exitMsg);
+	await ns.sleep(ExitTime);
+	await ns.exit();
 }
-export async function vigilanteShift(ns, gangMember) {
-	if (ns.gang.setMemberTask(gangMember, gangMemberList.gangMember[VigilanteTask])) {
-		await updateWorkerLists(gangMember, gangMemberList.gangMember[VigilanteTask])
-		return (true);
+
+/** @param {NS} ns **/
+async function isOptionAvailable(ns, userInput) {
+	for (
+		let optionIndex = LaunchOptions.length - 1;
+		optionIndex >= 0;
+		optionIndex--
+	) {
+		if (LaunchOptions[optionIndex] === userInput) {
+			return true;
+		}
 	}
-	return (false);
+	ns.print(`${userInput} is not a recognized argument.`);
+	return await unusableInput(ns);
+}
+
+/** @param {NS} ns **/
+async function optionSelect(ns, userInput) {
+	if (userInput === "loop") {
+		loop = true;
+		ns.print(`Loop activated, beginning the gang loop.`);
+		await gangLoop(ns);
+	} else if (userInput === "once") {
+		ns.print(`Beginning gang loop, once.`);
+		await gangLoop(ns);
+	} else if (userInput === "equip") {
+		ns.print(`Equiping the gang.`);
+		await equip(ns);
+	} else if (userInput === "ascend") {
+		ns.print(`Attempting an ascension.`);
+		await ascension(ns);
+	} else if (userInput === "work") {
+		ns.print(`Assigning gang to work.`);
+		await assignWork(ns);
+	}
+}
+
+/** @param {NS} ns **/
+async function gangLoop(ns) {
+	let loopTracker = 0;
+	while (true) {
+		await recruit(ns);
+		await equip(ns);
+		if (ascensionCheck(ns)) {
+			await ascension(ns);
+		}
+		await assignWork(ns);
+		if (myGang.territory < FullTerritory &&
+			!myGang.territoryWarfareEngaged) {
+			ns.gang.setTerritoryWarfare(await warfareCheck(ns));
+		} else if (myGang.territoryWarfareEngaged && myGang.territory == FullTerritory) {
+			ns.gang.setTerritoryWarfare(false);
+			ns.print(`Warfare Complete, territory owned: ${myGang.territory * 100}%`);
+		}
+		if (!loop) {
+			let exitMsg = `Single loop complete.`;
+			await exitScript(ns, exitMsg);
+		}
+		await ns.sleep(SleepTime);
+		if (++loopTracker % 10 == 0 || loopTracker == 1) {
+			ns.print(`Loops completed: ${loopTracker}`);
+		}
+	}
+}
+
+/** @param {NS} ns **/
+async function recruit(ns) {
+	while (ns.gang.canRecruitMember()) {
+		for (let potentialRecruit = 0; potentialRecruit < MaxGangSize; potentialRecruit++) {
+			if (ns.gang.recruitMember(potentialRecruit)) {
+				ns.print(`Recruited: ${potentialRecruit}`);
+			}
+		}
+	}
+	myGang = ns.gang.getGangInformation();
+	gangMembers = ns.gang.getMemberNames();
+}
+
+/** @param {NS} ns **/
+async function equip(ns) {
+	let allEquipment = ns.gang.getEquipmentNames();
+	for (let memberIndex = 0; memberIndex < gangMembers.length; ++memberIndex) {
+		let member = gangMembers[memberIndex];
+		let memberInfo = ns.gang.getMemberInformation(member);
+		for (let itemIndex = 0; itemIndex < allEquipment.length; ++itemIndex) {
+			let equipment = allEquipment[itemIndex];
+			if (
+				memberInfo.upgrades.indexOf(equipment) == -1 &&
+				memberInfo.augmentations.indexOf(equipment) == -1
+			) {
+				let cost = ns.gang.getEquipmentCost(equipment);
+				if (await canAfford(ns, cost)) {
+					ns.gang.purchaseEquipment(member, equipment);
+					ns.print(`${equipment} purchased for ${member}.`);
+				}
+			}
+		}
+	}
+}
+
+/** @param {NS} ns **/
+async function canAfford(ns, cost) {
+	let myCash = ns.getServerMoneyAvailable("home");
+	if (myCash >= cost) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
+/** @param {NS} ns **/
+async function ascensionCheck(ns) {
+	let currentTime = Date.now();
+	if (currentTime - ascensionTime > AscensionTimer) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
+/** @param {NS} ns **/
+async function ascension(ns) {
+	let ascensionCandidate = "None";
+	let maxGrowth = 0;
+	for (let member of gangMembers) {
+		let memberGrowth = ns.gang.getAscensionResult(member);
+		if (!memberGrowth) { // if member is unable to ascend, skip them.
+			continue;
+		}
+		let combatGrowth =
+			memberGrowth.str *
+			memberGrowth.def *
+			memberGrowth.dex *
+			memberGrowth.agi;
+		if (combatGrowth > MinAscension && combatGrowth > maxGrowth) {
+			ascensionCandidate = member;
+			maxGrowth = combatGrowth;
+		}
+	}
+	if (ascensionCandidate == "None") {
+		return;
+	} else {
+		ascensionTime = Date.now();
+		gang.ascendMember(ascensionCandidate);
+		ns.print(
+			`Member ${ascensionCandidate} has ascended with growth potential of ${maxGrowth}x.`
+		);
+		await equip(ns);
+		return;
+	}
+}
+
+/** @param {NS} ns **/
+async function assignWork(ns) {
+	let task = "";
+	for (let member of gangMembers) {
+		let memberInfo = ns.gang.getMemberInformation(member);
+		if (memberInfo.str < 50) {
+			task = "Train Combat";
+		} else if (
+			myGang.wantedPenalty < WantedPenaltyMin &&
+			myGang.wantedLevel > WantedLevelBase
+		) {
+			task = "Vigilante Justice";
+		} else if (memberInfo.str < 150) {
+			task = "Mug People";
+		} else if (memberInfo.str < 500) {
+			task = "Strongarm Civilians";
+		} else if (gangMembers.length < MaxGangSize) {
+			task = "Terrorism";
+		} else if (myGang.territory < FullTerritory) {
+			task = "Territory Warfare";
+		} else {
+			task = "Traffick Illegal Arms";
+		}
+
+		if (memberInfo.task != task) {
+			ns.gang.setMemberTask(member, task);
+			ns.print(`${member} assigned to ${task}`);
+		}
+	}
+}
+
+/** @param {NS} ns **/
+async function warfareCheck() {
+	let enemyGangs = ns.gang.getOtherGangInformation();
+	let maxPower = 0;
+	for (let gangName in enemyGangs) {
+		if (gangName == myGang.faction) {
+			continue;
+		}
+		maxPower = Math.max(maxPower, enemyGangs[gangName].power);
+	}
+	let warfareReady = myGang.power >= maxPower * WarfareMult;
+	if (warfareReady) {
+		ns.print(`Warfare engaged ${myGang.power} vs ${maxPower}`);
+	} else {
+		ns.print(`Gang's power: ${myGang.power}.`);
+		ns.print(`Opponent's power: ${maxPower}.`);
+	}
+	return warfareReady;
 }
